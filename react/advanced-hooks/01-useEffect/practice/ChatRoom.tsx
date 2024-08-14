@@ -23,7 +23,7 @@ const THREAD_NAME = 'all'
 
 export function ChatRoom({ user }: Props) {
   const chatBoardRef = useRef<HTMLDivElement>(null!)
-  // const inputRef = useRef<HTMLInputElement>(null!)
+  const inputRef = useRef<HTMLInputElement>(null!)
 
   const [input, setInput] = useState('')
   const [scrolledToBottom, setScrolledToBottom] = useState(true)
@@ -32,21 +32,51 @@ export function ChatRoom({ user }: Props) {
   // You'll use Date.now() for this state (which is a number)
   const [startSubscription, setStartSubscription] = useState<number | null>(null)
 
-  // Get initial messages
-  // api.chat.getMessages(THREAD_NAME).then((messages) => {
-  // })
 
-  // Subscribe to new messages
-  // const cleanup = api.chat.subscribe(
-  //   Date.now(),
-  //   (newMessages) => {
-  //   },
-  //   THREAD_NAME
-  // )
+  
+  useEffect(() => {
+    // Get initial messages
+    api.chat.getMessages(THREAD_NAME).then((messages) => {
+      setMessages(messages);
+      setStartSubscription(Date.now());
+    })
+  }, [])
+
+  useEffect(() => {
+    if (startSubscription) {
+    // Subscribe to new messages
+    const cleanup = api.chat.subscribe(
+      startSubscription,
+      (newMessages: ChatMessage[]) => {
+        setMessages((messages) => {
+          return (messages || []).concat(newMessages)
+        })
+        
+        setStartSubscription(Date.now())
+      },
+      THREAD_NAME
+    );
+        // Cleanup subscription on unmount
+    return () => cleanup();
+  }
+
+
+
+  }, [startSubscription]);
+
+  useEffect(() => {
+    if (scrolledToBottom) {
+      chatBoardRef.current.scrollTop = chatBoardRef.current.scrollHeight
+    }
+  }, [messages, scrolledToBottom])
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!user || !input) return
+
+    setInput('')
+    
+    inputRef.current.focus();
     api.chat.postMessage(input, user.id, user.name, user.avatarUrl, THREAD_NAME).then(() => {
       // noop (no operation)
       // We don't need to do anything when we post a message here to get it added to state. The
@@ -91,7 +121,8 @@ export function ChatRoom({ user }: Props) {
           className="form-field flex-1"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-        />
+        ref={inputRef}
+      />
         <button type="submit" className="button">
           Send
         </button>
